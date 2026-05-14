@@ -114,7 +114,43 @@ Sekce 3 'Co dělat dál': Konkrétní emocionální nebo finanční výsledek po
       content: s.content || ''
     }));
 
-    // ── 6. Return result ──────────────────────────────────
+    // ── 6. Send to n8n (fire & forget — не блокує відповідь) ─
+    const N8N_WEBHOOK_URL = 'https://depmarket.app.n8n.cloud/webhook/fillout_start';
+
+    // Витягуємо контактні дані студента з відповідей Fillout
+    const findAnswer = (keywords) => {
+      const q = questions.find(q =>
+        keywords.some(k => q.name?.toLowerCase().includes(k))
+      );
+      return q?.value || '';
+    };
+
+    const studentEmail = findAnswer(['email', 'e-mail', 'почт', 'mail']);
+    const studentName  = findAnswer(['name', 'jméno', 'ім\'я', 'имя', 'jmeno', 'firstName', 'first_name']);
+    const studentPhone = findAnswer(['phone', 'telefon', 'тел', 'phone', 'mobil']);
+
+    // Формуємо текст summary для email
+    const summaryText = sections
+      .map(s => `${s.title}\n${s.content}`)
+      .join('\n\n');
+
+    // Відправляємо в n8n без очікування відповіді
+    fetch(N8N_WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        submission_id,
+        form_id: FILLOUT_FORM_ID,
+        student_email: studentEmail,
+        student_name:  studentName,
+        student_phone: studentPhone,
+        summary_text:  summaryText,
+        sections:      sections,
+        questions_raw: questions
+      })
+    }).catch(err => console.error('n8n webhook error:', err));
+
+    // ── 7. Return result to browser ───────────────────────
     return res.status(200).json({ sections });
 
   } catch (err) {
